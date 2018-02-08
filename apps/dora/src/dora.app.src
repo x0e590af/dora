@@ -1,0 +1,21 @@
+{application, dora,
+ [{description, "An OTP application"},
+  {vsn, "0.1.0"},
+  {registered, []},
+  {mod, { dora_app, []}},
+  {applications,
+   [
+     kernel,
+     stdlib,
+     mnesia,
+     lager,
+     ranch,
+     poolboy
+   ]},
+  {env,[]},
+  {modules, []},
+
+  {maintainers, []},
+  {licenses, ["Apache 2.0"]},
+  {links, []}
+ ]}.
