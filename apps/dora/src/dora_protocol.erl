@@ -30,20 +30,57 @@
 %% API.
 
 start_link(Ref, Socket, Transport, Opts) ->
-
-
   {ok, proc_lib:spawn_link(?MODULE, init, [{Ref, Socket, Transport, Opts}])}.
 
 %% gen_server.
+
+%% This function is never called. We only define it so that
+%% we can use the -behaviour(gen_server) attribute.
+%init([]) -> {ok, undefined}.
+
 init({Ref, Socket, Transport, _Opts = []}) ->
 
-
-  ok = Transport:setopts(Socket, [{active, once}]),
+  lager:info("connect ~w",[Socket]),
   ok = ranch:accept_ack(Ref),
-  dora_operation:enter_loop(Socket, inet:peername(Socket), Transport).
+  ok = Transport:setopts(Socket, [{active, once}]),
+  gen_server:enter_loop(?MODULE, [],
+    #state{socket=Socket, transport=Transport}).
+
+handle_info({tcp, Socket, Data}, State=#state{socket=Socket, transport=Transport}) when byte_size(Data) > 1 ->
 
 
 
+    lager:info("ranch handle dataxxx : ~p",[Data]),
+
+    %% 获取数据库的配置
+    {ok, Pools} = application:get_env(dora, pools),
+    Nodes = hash_ring:list_to_nodes( [Name||{Name, SizeArgs, WorkerArgs}<-Pools]),
+
+    Ring0 = hash_ring:make(Nodes),
+
+    {ok ,  {hash_ring_node,HashRingVal,HashRingKey,1} }= hash_ring:find_node(item_1, Ring0),
+
+
+
+    lager:info("hash ring : ~p",[HashRingVal]),
+
+    Result = poolboy:transaction(HashRingVal, fun(Worker) ->
+          gen_server:call(Worker, {squery, Data})
+     end),
+
+    lager:info("ranch handle Result : ~p",[Result]),
+
+    Transport:setopts(Socket, [{active, once}]),
+    Transport:send(Socket, reverse_binary(Data)),
+  {noreply, State};
+
+
+handle_info({tcp_closed, _Socket}, State) ->
+  {stop, normal, State};
+handle_info({tcp_error, _, Reason}, State) ->
+  {stop, Reason, State};
+handle_info(timeout, State) ->
+  {stop, normal, State};
 handle_info(_Info, State) ->
   {stop, normal, State}.
 
@@ -60,3 +97,8 @@ code_change(_OldVsn, State, _Extra) ->
   {ok, State}.
 
 %% Internal.
+
+reverse_binary(B) when is_binary(B) ->
+  [list_to_binary(binary_to_list(
+    binary:part(B, {0, byte_size(B)-2})
+  )), "\r\n"].

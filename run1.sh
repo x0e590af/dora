@@ -1,6 +1,6 @@
 #!/bin/bash
 
-rm -rf  ./_build/rel
+rm -rf  ./_build/default/rel
 
 rebar3 release
 
