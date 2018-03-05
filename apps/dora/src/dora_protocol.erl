@@ -71,7 +71,7 @@ handle_info({tcp, Socket, Data}, State=#state{socket=Socket, transport=Transport
     lager:info("ranch handle Result : ~p",[Result]),
 
     Transport:setopts(Socket, [{active, once}]),
-    Transport:send(Socket, reverse_binary(Data)),
+    Transport:send(Socket, Result),
   {noreply, State};
 
 
